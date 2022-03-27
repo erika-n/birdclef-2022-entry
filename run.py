@@ -111,8 +111,10 @@ def train(model, epoch, log_interval, train_loader, device, optimizer):
         
         output = model(data)
 
+
+
         # negative log-likelihood for a tensor of size (batch x 1 x n_output)
-        loss = F.cross_entropy(output.squeeze(), target)
+        loss = F.binary_cross_entropy_with_logits(output.squeeze(), target)
 
         optimizer.zero_grad()
         loss.backward()
@@ -124,49 +126,50 @@ def train(model, epoch, log_interval, train_loader, device, optimizer):
 
 
 
-def number_of_correct(pred, target):
-    # count number of correct predictions
-
-    return pred.squeeze().eq(target).sum().item()
-
-
-def get_likely_index(tensor):
-    # find most likely label index for each element in the batch
-    return tensor.argmax(dim=-1)
-
 
 def test(model, epoch, train_loader, test_loader, device):
     model.eval()
     correct = 0
 
 
-    data, target = next(iter(train_loader))
-    data = data.to(device)
-    target = target.to(device)
-    output = model(data)
-    pred = get_likely_index(output)
-    correct = number_of_correct(pred, target)
-    print("train predicted: ", pred.squeeze()[:15])
-    print("train target:    ", target[:15])
-    print(f"train pct:({100. * correct / len(target):.0f}%)")
-    correct = 0
+    # data, target = next(iter(train_loader))
+    # data = data.to(device)
+    # target = target.to(device)
+    # output = model(data)
+    # pred = get_likely_index(output)
+    # correct = number_of_correct(pred, target)
+    # print("train predicted: ", pred.squeeze()[:15])
+    # print("train target:    ", target[:15])
+    # print(f"train pct:({100. * correct / len(target):.0f}%)")
+    # correct = 0
 
     for data, target in test_loader:
 
         data = data.to(device)
         target = target.to(device)
+        n_labels = list(target.size())[-1]
 
         # apply transform and model on whole batch directly on device
         #data = transform(data)
         output = model(data)
+        output = F.softmax(output, dim=2)
+        print("output as softmax", output)
+        output = (output > 1.0/n_labels)
+        output = torch.squeeze(output)
+        
+        target = (target >= 1.0)
+        print("output", output)
+        print("target", target)
+        true_positive = torch.logical_and(output, target).float()
+        true_negative = torch.logical_and(torch.logical_not(output), torch.logical_not(target)).float()
 
-        pred = get_likely_index(output)
-        correct += number_of_correct(pred, target)
-        print("predicted: ", pred.squeeze()[:15])
-        print("target:    ", target[:15])
+        print("true positive", true_positive)
+        print("true negative", true_negative)
 
+        correct += true_positive.sum() + true_negative.sum()
 
-    print(f"\nTest Epoch: {epoch}\tAccuracy: {correct}/{len(test_loader.dataset)} ({100. * correct / len(test_loader.dataset):.0f}%)\n")
+        
+    print(f"\nTest Epoch: {epoch}\tAccuracy: {correct}/{n_labels*len(test_loader.dataset)} ({100. * correct / (n_labels*len(test_loader.dataset)):.0f}%)\n")
 
 
 

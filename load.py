@@ -26,6 +26,7 @@ class BirdClefDataset(Dataset):
         scored_birds = ""
         with open('current_birds.json') as f:
             scored_birds = json.load(f)
+        scored_birds = scored_birds[:4]
 
         self.metadata_file = pd.read_csv(metadata_file)
 
@@ -37,7 +38,7 @@ class BirdClefDataset(Dataset):
         self.metadata_file = self.metadata_file.loc[self.metadata_file["primary_label"].isin(scored_birds)] # take only from scored birds
         self.metadata_file = self.metadata_file.loc[self.metadata_file["samples"] > n_samples*n_per_file] # take only if there is enough audio for n_per_file examples
         self.metadata_file = self.metadata_file.loc[self.metadata_file["rating"] > 4] # take only highly rated tracks
-        self.metadata_file = self.metadata_file.groupby("primary_label").head(12) # take first ten from each species
+        self.metadata_file = self.metadata_file.groupby("primary_label").head(12) # take first N from each species
         self.metadata_file = self.metadata_file.reset_index() 
 
         self.audio_dir = audio_dir
@@ -65,13 +66,13 @@ class BirdClefDataset(Dataset):
 
         text_label = self.metadata_file["primary_label"][idx % len(self.metadata_file)]
         label = self.labels.index(text_label)
-        # target = torch.zeros(len(self.labels))
-        # target[label] = 1
+        target = torch.zeros(len(self.labels))
+        target[label] = 1
         if self.transform:
             audio = self.transform(audio)
         if self.target_transform:
             label = self.target_transform(label)
-        return audio, label
+        return audio,target
 
 
 
@@ -118,8 +119,8 @@ class MusicDataset(Dataset):
 
 
 if __name__ == "__main__":
-    full_dataset = BirdClefDataset(target_transform=Lambda(lambda y: torch.zeros(21, dtype=torch.float).scatter_(0, torch.tensor(y), value=1)))
-
+    #full_dataset = BirdClefDataset(target_transform=Lambda(lambda y: torch.zeros(21, dtype=torch.float).scatter_(0, torch.tensor(y), value=1)))
+    full_dataset = BirdClefDataset()
     print('labels', full_dataset.labels)
 
     train_size = int(0.8 * len(full_dataset))
@@ -130,6 +131,7 @@ if __name__ == "__main__":
     # Display image and label.
     train_features, train_labels = next(iter(train_dataloader))
     print(f"Feature batch shape: {train_features.size()}")
+    print("labels shape", train_labels.size())
     print('train labels', train_labels)
     print('train labels 0', train_labels[0])
 
