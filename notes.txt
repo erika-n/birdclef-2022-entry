@@ -1,0 +1,1 @@
+Got to 80% accuracy on the top 20 most popular birds after 67 epochs using the 1d model and 10000 samples per data point
