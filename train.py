@@ -11,6 +11,7 @@ from models import BirdConv1d, BirdConv2d
 def run(which_model, which_data):
     print("Using model", which_model)
     print("Using data", which_data)
+    model_name = which_data + "_" + which_model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device", device)
     batch_size = 100
@@ -88,7 +89,7 @@ def run(which_model, which_data):
 
 
     for epoch in range(1, n_epoch + 1):
-        train(model, epoch, log_interval, train_loader, device, optimizer)
+        train(model, epoch, log_interval, train_loader, device, optimizer, model_name)
         test(model, epoch, train_loader, test_loader, device)
         scheduler.step()
 
@@ -99,7 +100,7 @@ def count_parameters(model):
 
 
 
-def train(model, epoch, log_interval, train_loader, device, optimizer):
+def train(model, epoch, log_interval, train_loader, device, optimizer, model_name):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
 
@@ -123,7 +124,7 @@ def train(model, epoch, log_interval, train_loader, device, optimizer):
         # print training stats
         if batch_idx % log_interval == 0:
             print(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}")
-
+            torch.save(model.state_dict(), 'models/' + model_name)
 
 
 
