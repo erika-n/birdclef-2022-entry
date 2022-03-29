@@ -7,6 +7,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchaudio
 from models import BirdConv1d, BirdConv2d
+from timeit import default_timer as timer
+from torchaudio.datasets.utils import bg_iterator
 
 def run(which_model, which_data):
     print("Using model", which_model)
@@ -24,7 +26,7 @@ def run(which_model, which_data):
         num_workers = 0
         pin_memory = False
 
-    sample_rate=10000
+    sample_rate=32000
     new_sample_rate = 8000
 
     if which_model == "1d":
@@ -34,7 +36,7 @@ def run(which_model, which_data):
 
 
     if which_data == "birds":
-        full_dataset = BirdClefDataset(n_samples=n_samples, transform=transform)
+        full_dataset = BirdClefDataset(n_samples=n_samples)
     elif which_data == "music":
         full_dataset = MusicDataset(n_samples=n_samples)
 
@@ -81,7 +83,7 @@ def run(which_model, which_data):
     print("Number of parameters: %s" % n)
 
 
-    optimizer = optim.Adam(model.parameters(), lr=0.005, weight_decay=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
     log_interval = 1
@@ -102,8 +104,10 @@ def count_parameters(model):
 
 def train(model, epoch, log_interval, train_loader, device, optimizer, model_name):
     model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
+    start_time = timer()
+    for batch_idx, (data, target) in enumerate(bg_iterator(train_loader)):
 
+        
         data = data.to(device)
         target = target.to(device)
 
@@ -121,16 +125,21 @@ def train(model, epoch, log_interval, train_loader, device, optimizer, model_nam
         loss.backward()
         optimizer.step()
 
+        end_time = timer()
         # print training stats
         if batch_idx % log_interval == 0:
-            print(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}")
+            print(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}\tTime: {end_time - start_time:.2f}")
             torch.save(model.state_dict(), 'models/' + model_name)
+        start_time = timer()
 
 
 
 def test(model, epoch, train_loader, test_loader, device):
     model.eval()
-    correct = 0
+    true_positive = 0
+    true_negative = 0
+    false_positive = 0
+    false_negative = 0
 
 
     # data, target = next(iter(train_loader))
@@ -154,25 +163,34 @@ def test(model, epoch, train_loader, test_loader, device):
         #data = transform(data)
         output = model(data)
         output = F.softmax(output, dim=2)
-        print("output as softmax", output)
+       # print("output as softmax", output)
         output = (output > 1.0/n_labels)
         output = torch.squeeze(output)
         
         target = (target >= 1.0)
-        print("output", output)
-        print("target", target)
-        true_positive = torch.logical_and(output, target).float()
-        true_negative = torch.logical_and(torch.logical_not(output), torch.logical_not(target)).float()
+        #print("output", output)
+        #print("target", target)
+        this_tp= torch.logical_and(output, target).float()
+        this_tn = torch.logical_and(torch.logical_not(output), torch.logical_not(target)).float()
+        this_fp = torch.logical_and(output, torch.logical_not(target))
+        this_fn = torch.logical_and(torch.logical_not(output), target)
+        #print("true positive", true_positive)
+        #print("true negative", true_negative)
 
-        print("true positive", true_positive)
-        print("true negative", true_negative)
+        true_positive += this_tp.sum()
+        true_negative += this_tn.sum()
+        false_positive += this_fp.sum()
+        false_negative += this_fn.sum()
 
-        correct += true_positive.sum() + true_negative.sum()
-
-        
-    print(f"\nTest Epoch: {epoch}\tAccuracy: {correct}/{n_labels*len(test_loader.dataset)} ({100. * correct / (n_labels*len(test_loader.dataset)):.0f}%)\n")
-
-
+    total = true_positive + false_positive + true_negative + false_negative
+    precision = true_positive/(true_positive + false_positive)
+    recall = true_positive/(true_positive + false_negative)
+    f1 = 2*precision*recall/(precision + recall)
+    print(f"\nTest Epoch: {epoch}")
+    print(f"\tAccuracy: {true_positive + true_negative}/{total} ({100. * (true_positive + true_negative) / (n_labels*len(test_loader.dataset)):.0f}%)")
+    print(f"\tPrecision: {true_positive}/{true_positive + false_positive} ({100. * true_positive/(true_positive + false_positive):.0f}%)")
+    print(f"\tRecall: {true_positive}/{true_positive + false_negative} ({100. * true_positive/(true_positive + false_negative):.0f}%)")
+    print(f"\tF1 {f1}")
 
 if __name__ == "__main__":
     import argparse

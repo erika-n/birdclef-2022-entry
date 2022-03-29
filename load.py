@@ -16,15 +16,15 @@ from torch.utils.data import DataLoader,random_split
 from torchvision.transforms import Lambda
 
 import json
-
+from timeit import default_timer as timer
 
 # Dataset for BirdClef 2022. 
 
 class BirdClefDataset(Dataset):
-    def __init__(self, n_samples=10000, n_per_file = 10, metadata_file="train_metadata_updated.csv", audio_dir="G:/birdclef-2022/train_audio", transform=None, target_transform=None):
+    def __init__(self, n_samples=10000, n_per_file = 10, metadata_file="train_metadata_updated.csv", audio_dir="G:/birdclef-2022/train_audio", scored_birds_file="current_birds.json", transform=None, target_transform=None):
         
         scored_birds = ""
-        with open('current_birds.json') as f:
+        with open(scored_birds_file) as f:
             scored_birds = json.load(f)
         #scored_birds = scored_birds[:4]
 
@@ -38,7 +38,7 @@ class BirdClefDataset(Dataset):
         self.metadata_file = self.metadata_file.loc[self.metadata_file["primary_label"].isin(scored_birds)] # take only from scored birds
         self.metadata_file = self.metadata_file.loc[self.metadata_file["samples"] > n_samples*n_per_file] # take only if there is enough audio for n_per_file examples
         self.metadata_file = self.metadata_file.loc[self.metadata_file["rating"] > 4] # take only highly rated tracks
-        self.metadata_file = self.metadata_file.groupby("primary_label").head(12) # take first N from each species
+        self.metadata_file = self.metadata_file.groupby("primary_label").head(20) # take first N from each species
         self.metadata_file = self.metadata_file.reset_index() 
 
         self.audio_dir = audio_dir
@@ -74,6 +74,25 @@ class BirdClefDataset(Dataset):
             label = self.target_transform(label)
         return audio,target
 
+
+
+class SoundscapeDataset(Dataset):
+    def __init__(self, n_samples=10000,  soundscape_dir="random_soundscapes"):
+    
+        self.files = [f for f in listdir(soundscape_dir) if (f[-4:] == ".wav")]
+
+
+
+
+
+
+    def __len__(self):
+        return len(self.metadata_file)*self.n_per_file
+
+    def __getitem__(self, idx):
+
+        which = math.floor(idx/(len(self.metadata_file)))
+  
 
 
 
@@ -127,11 +146,14 @@ if __name__ == "__main__":
     test_size = len(full_dataset) - train_size
     training_data, test_data = torch.utils.data.random_split(full_dataset, [train_size, test_size])
 
-    train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
+    train_dataloader = DataLoader(training_data, batch_size=100, shuffle=True)
     # Display image and label.
+    start_time = timer()
     train_features, train_labels = next(iter(train_dataloader))
     print(f"Feature batch shape: {train_features.size()}")
     print("labels shape", train_labels.size())
     print('train labels', train_labels)
     print('train labels 0', train_labels[0])
+    end_time = timer()
+    print("time", end_time - start_time)
 
