@@ -38,8 +38,12 @@ class BirdClefDataset(Dataset):
         self.metadata_file = self.metadata_file.loc[self.metadata_file["primary_label"].isin(scored_birds)] # take only from scored birds
         self.metadata_file = self.metadata_file.loc[self.metadata_file["samples"] > n_samples*n_per_file] # take only if there is enough audio for n_per_file examples
         self.metadata_file = self.metadata_file.loc[self.metadata_file["rating"] > 4] # take only highly rated tracks
-        self.metadata_file = self.metadata_file.groupby("primary_label").head(20) # take first N from each species
+        self.metadata_file = self.metadata_file.groupby("primary_label").head(40) # take first N from each species
+        self.metadata_file.sort_values(by=['primary_label'], inplace=True)
         self.metadata_file = self.metadata_file.reset_index() 
+
+
+        
 
         self.audio_dir = audio_dir
         self.transform = transform
@@ -48,26 +52,46 @@ class BirdClefDataset(Dataset):
         self.n_samples = n_samples
         self.n_per_file = n_per_file
 
+        self.audio_data = []
+
+        for idx, row in self.metadata_file.iterrows():
+            audio_path = os.path.join(self.audio_dir, self.metadata_file["filename"][idx])
+            audio, rate = torchaudio.load(audio_path)
+            audio = audio[0] # use only left channel
+            audio = audio[:n_samples*n_per_file] # keep only the bytes used
+            self.audio_data.append(audio)
+            # print("adding audio data ", idx)
+            # print("filename", audio_path)
+
+
+
+
+
 
     def __len__(self):
         return len(self.metadata_file)*self.n_per_file
 
     def __getitem__(self, idx):
 
-        which = math.floor(idx/(len(self.metadata_file)))
-  
-        audio_path = os.path.join(self.audio_dir, self.metadata_file["filename"][idx % len(self.metadata_file)])
-        audio, rate = torchaudio.load(audio_path)
-        audio = audio[0] # use only left channel
-
-        
-        audio = audio[which*self.n_samples:(which + 1)*self.n_samples] # use the first N bytes
+        which_n = math.floor(idx/(len(self.metadata_file)))
+        which_file = idx % len(self.metadata_file)
+        # print("len file", len(self.metadata_file))
+        # print("idx",  idx)
+        # print("which_file", which_file)
+        # print("len audio data", len(self.audio_data))
+      
+        audio = self.audio_data[which_file]
+        audio = audio[which_n*self.n_samples:(which_n + 1)*self.n_samples] # use the first N bytes
         audio = audio.reshape([1, -1]) # add channel field back
 
-        text_label = self.metadata_file["primary_label"][idx % len(self.metadata_file)]
+        text_label = self.metadata_file["primary_label"][which_file]
         label = self.labels.index(text_label)
         target = torch.zeros(len(self.labels))
         target[label] = 1
+        
+        # print("text_label", text_label)
+        # print("label", label)
+        
         if self.transform:
             audio = self.transform(audio)
         if self.target_transform:
@@ -141,6 +165,7 @@ if __name__ == "__main__":
     #full_dataset = BirdClefDataset(target_transform=Lambda(lambda y: torch.zeros(21, dtype=torch.float).scatter_(0, torch.tensor(y), value=1)))
     full_dataset = BirdClefDataset()
     print('labels', full_dataset.labels)
+    print('len labels', len(full_dataset.labels))
 
     train_size = int(0.8 * len(full_dataset))
     test_size = len(full_dataset) - train_size

@@ -8,7 +8,7 @@ import torch.optim as optim
 import torchaudio
 from models import BirdConv1d, BirdConv2d
 from timeit import default_timer as timer
-from torchaudio.datasets.utils import bg_iterator
+
 
 def run(which_model, which_data):
     print("Using model", which_model)
@@ -16,7 +16,7 @@ def run(which_model, which_data):
     model_name = which_data + "_" + which_model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device", device)
-    batch_size = 100
+    batch_size =64
     n_samples = 32000
 
     if device == "cuda":
@@ -83,11 +83,11 @@ def run(which_model, which_data):
     print("Number of parameters: %s" % n)
 
 
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.0001)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
-    log_interval = 1
-    n_epoch = 200
+    log_interval = 10
+    n_epoch = 2000
 
 
     for epoch in range(1, n_epoch + 1):
@@ -105,7 +105,7 @@ def count_parameters(model):
 def train(model, epoch, log_interval, train_loader, device, optimizer, model_name):
     model.train()
     start_time = timer()
-    for batch_idx, (data, target) in enumerate(bg_iterator(train_loader)):
+    for batch_idx, (data, target) in enumerate(train_loader):
 
         
         data = data.to(device)
@@ -163,25 +163,29 @@ def test(model, epoch, train_loader, test_loader, device):
         #data = transform(data)
         output = model(data)
         output = F.softmax(output, dim=2)
-       # print("output as softmax", output)
-        output = (output > 1.0/n_labels)
+        #print("output as softmax", output[1])
+        output = (output > 6.0/n_labels)
+        #print("2.0/n_labels", 2.0/n_labels)
         output = torch.squeeze(output)
         
         target = (target >= 1.0)
-        #print("output", output)
-        #print("target", target)
+        # print("output", output[1])
+        # print("target", target[1])
         this_tp= torch.logical_and(output, target).float()
         this_tn = torch.logical_and(torch.logical_not(output), torch.logical_not(target)).float()
         this_fp = torch.logical_and(output, torch.logical_not(target))
         this_fn = torch.logical_and(torch.logical_not(output), target)
-        #print("true positive", true_positive)
-        #print("true negative", true_negative)
+        
 
         true_positive += this_tp.sum()
         true_negative += this_tn.sum()
         false_positive += this_fp.sum()
         false_negative += this_fn.sum()
 
+    # print("true positive", true_positive)
+    # print("true negative", true_negative)
+    # print("false positive", false_positive)
+    # print("false negative", false_negative)
     total = true_positive + false_positive + true_negative + false_negative
     precision = true_positive/(true_positive + false_positive)
     recall = true_positive/(true_positive + false_negative)
@@ -190,7 +194,8 @@ def test(model, epoch, train_loader, test_loader, device):
     print(f"\tAccuracy: {true_positive + true_negative}/{total} ({100. * (true_positive + true_negative) / (n_labels*len(test_loader.dataset)):.0f}%)")
     print(f"\tPrecision: {true_positive}/{true_positive + false_positive} ({100. * true_positive/(true_positive + false_positive):.0f}%)")
     print(f"\tRecall: {true_positive}/{true_positive + false_negative} ({100. * true_positive/(true_positive + false_negative):.0f}%)")
-    print(f"\tF1 {f1}")
+    print(f"\tF1 {f1:.5f}")
+    print(f"\ttotal examples: {len(test_loader.dataset)}")
 
 if __name__ == "__main__":
     import argparse
