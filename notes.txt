@@ -1,3 +1,79 @@
+
+4/6/2022
+
+Problems:
+
+* Nocall: need to accurately decide whether a segment has no bird in it
+* Data loading: data loading is inefficient which means I am using less data than I should. 
+        Need to be able to use more data than I can load into memory
+* Multi label problem: Need to reconfigure so that it is appropriately 
+        treating this as a multi label problem
+* Spectrogram: why is the model doing worse with the spectrogram/2dConvolution setup?
+
+
+
+2d model:
+(factor is thresholding factor used in test loop)
+using 6.0 factor
+Test Epoch: 56
+        Accuracy: 35947.0/38724.0 (93%)
+        Precision: 411.0/2677.0 (15%)
+        Recall: 411.0/922.0 (45%)
+        F1 0.22840
+        total examples: 922
+Using 5.0 factor
+Test Epoch: 18
+        Accuracy: 37625.0/38724.0 (97%)
+        Precision: 228.0/633.0 (36%)
+        Recall: 228.0/922.0 (25%)
+        F1 0.29325
+        total examples: 922
+
+
+4/4/2022
+
+2d model:
+
+
+Test Epoch: 46 (using 6.5 factor)
+        Accuracy: 39509.0/40572.0 (97%)
+        Precision: 148.0/393.0 (38%)
+        Recall: 148.0/966.0 (15%)
+        F1 0.21781
+        total examples: 966
+
+
+Test Epoch: 62
+        Accuracy: 39169.0/40572.0 (97%)
+        Precision: 232.0/901.0 (26%)
+        Recall: 232.0/966.0 (24%)
+        F1 0.24853
+        total examples: 966
+
+1d model: 
+Test Epoch: 91
+        Accuracy: 37147.0/40572.0 (92%)
+        Precision: 788.0/4035.0 (20%)
+        Recall: 788.0/966.0 (82%)
+        F1 0.31514
+        total examples: 966
+
+
+Test Epoch: 32 (using 6.0 factor)
+        Accuracy: 39679.0/40572.0 (98%)
+        Precision: 551.0/1029.0 (54%)
+        Recall: 551.0/966.0 (57%)
+        F1 0.55238
+        total examples: 966
+
+Test Epoch: 31 (using 7.0 factor)
+        Accuracy: 39680.0/40572.0 (98%)
+        Precision: 493.0/912.0 (54%)
+        Recall: 493.0/966.0 (51%)
+        F1 0.52503
+        total examples: 966
+
+
 3/29/2022:
 It turns out that data loading accounts for the majority of training time. 
 

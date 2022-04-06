@@ -17,22 +17,23 @@ def run(which_model, which_data):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device", device)
     batch_size =64
-    n_samples = 32000
+    n_samples = 64000
 
     if device == "cuda":
-        num_workers = 1
+        num_workers = 5
         pin_memory = True
     else:
         num_workers = 0
         pin_memory = False
 
-    sample_rate=32000
-    new_sample_rate = 8000
 
-    if which_model == "1d":
-        transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
-    elif which_model == "2d":
-        transform = torchaudio.transforms.Spectrogram(n_fft=400, hop_length=50)
+
+    # if which_model == "1d":
+    #    sample_rate=32000
+    #    new_sample_rate = 8000
+    #     transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
+    # elif which_model == "2d":
+    #     transform = torchaudio.transforms.Spectrogram(n_fft=400, hop_length=50)
 
 
     if which_data == "birds":
@@ -118,7 +119,6 @@ def train(model, epoch, log_interval, train_loader, device, optimizer, model_nam
 
 
 
-        # negative log-likelihood for a tensor of size (batch x 1 x n_output)
         loss = F.binary_cross_entropy_with_logits(output.squeeze(), target)
 
         optimizer.zero_grad()
@@ -162,8 +162,10 @@ def test(model, epoch, train_loader, test_loader, device):
         # apply transform and model on whole batch directly on device
         #data = transform(data)
         output = model(data)
-        output = F.softmax(output, dim=2)
-        #print("output as softmax", output[1])
+        #print('output', output)
+        output = F.softmax(output.squeeze(), dim=1) # ??
+        #print("output as softmax", output)
+  
         output = (output > 6.0/n_labels)
         #print("2.0/n_labels", 2.0/n_labels)
         output = torch.squeeze(output)

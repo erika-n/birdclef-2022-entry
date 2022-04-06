@@ -26,7 +26,7 @@ class BirdClefDataset(Dataset):
         scored_birds = ""
         with open(scored_birds_file) as f:
             scored_birds = json.load(f)
-        #scored_birds = scored_birds[:4]
+        #scored_birds = scored_birds[:2] # use a subset for testing
 
         self.metadata_file = pd.read_csv(metadata_file)
 
