@@ -1,5 +1,5 @@
 from shutil import which
-from load import BirdClefDataset, MusicDataset
+from load import BirdClefDataset, MusicDataset, BirdClefWavDataset
 
 
 import torch
@@ -20,7 +20,7 @@ def run(which_model, which_data):
     n_samples = 64000
 
     if device == "cuda":
-        num_workers = 5
+        num_workers = 10
         pin_memory = True
     else:
         num_workers = 0
@@ -38,6 +38,8 @@ def run(which_model, which_data):
 
     if which_data == "birds":
         full_dataset = BirdClefDataset(n_samples=n_samples)
+    elif which_data == "birds-wav":
+        full_dataset = BirdClefWavDataset(n_samples=n_samples)
     elif which_data == "music":
         full_dataset = MusicDataset(n_samples=n_samples)
 
@@ -132,26 +134,29 @@ def train(model, epoch, log_interval, train_loader, device, optimizer, model_nam
             torch.save(model.state_dict(), 'models/' + model_name)
         start_time = timer()
 
+def number_of_correct(pred, target):
+    # count number of correct predictions
+    return pred.squeeze().eq(target).sum().item()
 
+
+def get_likely_index(tensor):
+    # find most likely label index for each element in the batch
+    return tensor.argmax(dim=-1)
 
 def test(model, epoch, train_loader, test_loader, device):
     model.eval()
-    true_positive = 0
-    true_negative = 0
-    false_positive = 0
-    false_negative = 0
+    correct = 0
 
-
-    # data, target = next(iter(train_loader))
-    # data = data.to(device)
-    # target = target.to(device)
-    # output = model(data)
-    # pred = get_likely_index(output)
-    # correct = number_of_correct(pred, target)
-    # print("train predicted: ", pred.squeeze()[:15])
-    # print("train target:    ", target[:15])
-    # print(f"train pct:({100. * correct / len(target):.0f}%)")
-    # correct = 0
+    data, target = next(iter(train_loader))
+    data = data.to(device)
+    target = target.to(device)
+    output = model(data)
+    pred = get_likely_index(output)
+    correct = number_of_correct(pred, target)
+    print("train predicted: ", pred.squeeze()[:15])
+    print("train target:    ", target[:15])
+    print(f"train pct:({100. * correct / len(target):.0f}%)")
+    correct = 0
 
     for data, target in test_loader:
 
@@ -159,44 +164,18 @@ def test(model, epoch, train_loader, test_loader, device):
         target = target.to(device)
         n_labels = list(target.size())[-1]
 
-        # apply transform and model on whole batch directly on device
-        #data = transform(data)
+
         output = model(data)
-        #print('output', output)
-        output = F.softmax(output.squeeze(), dim=1) # ??
-        #print("output as softmax", output)
-  
-        output = (output > 6.0/n_labels)
-        #print("2.0/n_labels", 2.0/n_labels)
-        output = torch.squeeze(output)
-        
-        target = (target >= 1.0)
-        # print("output", output[1])
-        # print("target", target[1])
-        this_tp= torch.logical_and(output, target).float()
-        this_tn = torch.logical_and(torch.logical_not(output), torch.logical_not(target)).float()
-        this_fp = torch.logical_and(output, torch.logical_not(target))
-        this_fn = torch.logical_and(torch.logical_not(output), target)
-        
 
-        true_positive += this_tp.sum()
-        true_negative += this_tn.sum()
-        false_positive += this_fp.sum()
-        false_negative += this_fn.sum()
+        #output = F.softmax(output.squeeze(), dim=1) 
 
-    # print("true positive", true_positive)
-    # print("true negative", true_negative)
-    # print("false positive", false_positive)
-    # print("false negative", false_negative)
-    total = true_positive + false_positive + true_negative + false_negative
-    precision = true_positive/(true_positive + false_positive)
-    recall = true_positive/(true_positive + false_negative)
-    f1 = 2*precision*recall/(precision + recall)
+        pred = get_likely_index(output)
+        target = get_likely_index(target)
+        correct += number_of_correct(pred, target)
+
     print(f"\nTest Epoch: {epoch}")
-    print(f"\tAccuracy: {true_positive + true_negative}/{total} ({100. * (true_positive + true_negative) / (n_labels*len(test_loader.dataset)):.0f}%)")
-    print(f"\tPrecision: {true_positive}/{true_positive + false_positive} ({100. * true_positive/(true_positive + false_positive):.0f}%)")
-    print(f"\tRecall: {true_positive}/{true_positive + false_negative} ({100. * true_positive/(true_positive + false_negative):.0f}%)")
-    print(f"\tF1 {f1:.5f}")
+    print(f"\tAccuracy: {correct}/{len(test_loader.dataset)} ({100. * (correct) / (len(test_loader.dataset)):.0f}%)")
+
     print(f"\ttotal examples: {len(test_loader.dataset)}")
 
 if __name__ == "__main__":

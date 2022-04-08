@@ -100,6 +100,72 @@ class BirdClefDataset(Dataset):
 
 
 
+class BirdClefWavDataset(Dataset):
+    def __init__(self, n_samples=10000, n_per_file = 10, metadata_file="train_metadata_updated.csv", audio_dir="G:/birdclef-2022/train_audio", scored_birds_file="current_birds.json", transform=None, target_transform=None):
+        
+        scored_birds = ""
+        with open(scored_birds_file) as f:
+            scored_birds = json.load(f)
+        #scored_birds = scored_birds[:2] # use a subset for testing
+
+        self.metadata_file = pd.read_csv(metadata_file)
+
+        taxonomy_file = "G:/birdclef-2022/eBird_Taxonomy_v2021.csv"
+        td = pd.read_csv(taxonomy_file)
+        self.metadata_file = pd.merge(self.metadata_file, td, left_on="primary_label", right_on="SPECIES_CODE")
+
+
+        self.metadata_file = self.metadata_file.loc[self.metadata_file["primary_label"].isin(scored_birds)] # take only from scored birds
+        self.metadata_file = self.metadata_file.loc[self.metadata_file["samples"] > n_samples*n_per_file] # take only if there is enough audio for n_per_file examples
+        self.metadata_file = self.metadata_file.loc[self.metadata_file["rating"] > 4] # take only highly rated tracks
+        self.metadata_file = self.metadata_file.groupby("primary_label").head(40) # take first N from each species
+        self.metadata_file.sort_values(by=['primary_label'], inplace=True)
+        self.metadata_file = self.metadata_file.reset_index() 
+
+
+        
+
+        self.audio_dir = audio_dir
+        self.transform = transform
+        self.target_transform = target_transform
+        self.labels = sorted(scored_birds)
+        self.n_samples = n_samples
+        self.n_per_file = n_per_file
+
+        self.audio_data = []
+
+    def __len__(self):
+        return len(self.metadata_file)*self.n_per_file
+
+    def __getitem__(self, idx):
+
+        which_n = math.floor(idx/(len(self.metadata_file)))
+        meta_idx = idx % len(self.metadata_file)
+        text_label = self.metadata_file["primary_label"][meta_idx]
+        oggname = self.metadata_file["filename"][meta_idx]
+        wavname = oggname[:-4] + ".wav"
+        filepath = "G:/birdclef-2022/train_audio_wav/"  + wavname
+        audio, rate = torchaudio.load(filepath)
+        audio = audio[0] # use only left channel
+        audio = audio[which_n*self.n_samples:(which_n + 1)*self.n_samples] # use the first N bytes
+        audio = audio.reshape([1, -1]) # add channel field back
+
+        
+        label = self.labels.index(text_label)
+        target = torch.zeros(len(self.labels))
+        target[label] = 1
+        
+        # print("text_label", text_label)
+        # print("label", label)
+        
+        if self.transform:
+            audio = self.transform(audio)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return audio,target
+
+
+
 class SoundscapeDataset(Dataset):
     def __init__(self, n_samples=10000,  soundscape_dir="random_soundscapes"):
     

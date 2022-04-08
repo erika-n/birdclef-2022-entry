@@ -66,10 +66,10 @@ class BirdConv2d(nn.Module):
             power=2.0,
         )
 
-        self.conv1 = nn.Conv2d(n_input, n_channel, kernel_size=3, stride=stride)
+        self.conv1 = nn.Conv2d(n_input, n_channel, kernel_size=5, stride=stride)
         self.bn1 = nn.BatchNorm2d(n_channel)
         self.pool1 = nn.MaxPool2d(3)
-        self.conv2 = nn.Conv2d(n_channel, n_channel, kernel_size=3)
+        self.conv2 = nn.Conv2d(n_channel, n_channel, kernel_size=5)
         self.bn2 = nn.BatchNorm2d(n_channel)
         self.pool2 = nn.MaxPool2d(3)
         self.conv3 = nn.Conv2d(n_channel, 2 * n_channel, kernel_size=3)
